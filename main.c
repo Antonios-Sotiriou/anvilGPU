@@ -16,11 +16,13 @@ const char *vertexShaderSource = "#version 450 core\n"
     "layout (location = 0) in vec3 aPos;\n"
     "layout (location = 1) in vec3 aColor;\n"
 
+    "uniform mat4 mvpMatrix;\n"
+
     "layout (location = 0) out vec4 bPos;\n"
     "layout (location = 1) out vec4 newColor;\n"
 
     "void main() {\n"
-    "    bPos = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+    "    vec4 bPos = mvpMatrix * vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
     "    gl_Position = bPos;\n"
     "    newColor = vec4(aColor, 1.0f);\n"
     "}\n\0";
@@ -82,23 +84,26 @@ XVisualInfo             *vinfo;
 GLint                   att[]   = { GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None };
 
 /* BUFFERS. */
-u_int8_t *frame_buffer;
 
 /* Project Global Variables. */
-static float FOV          = 45.0;
-static float ZNEAR        = 0.01;
-static float ZFAR         = 1000.0;
-float FPlane              = 0.00001;
-float NPlane              = 1.0;
-static float ASPECTRATIO  = 1;
+static int PROJECTIONVIEW = 0;
 static int EYEPOINT       = 0;
+static float FOV          = 45.0;
+static float ZNEAR        = -1;
+static float ZFAR         = -1000.0;
+static float ASPECTRATIO  = 1;
+float NPlane              = 1.0;
+float FPlane              = 0.00001;
+float SCALE               = 1.0;
+float AmbientStrength     = 0.15;
+float SpecularStrength    = 0.5;
 
 /* Camera and Global light Source. */
 vec4f camera[N + 1] = {
-    { 0.0, 0.0, 0.0, 1.0 },
+    { 0.0, 0.0, -5.0, 1.0 },
     { 1.0, 0.0, 0.0, 0.0 },
     { 0.0, 1.0, 0.0, 0.0 },
-    { 0.0, 0.0, -1.0, 0.0 }
+    { 0.0, 0.0, 1.0, 0.0 }
 };
 vec4f light[C + 1] = {
     { -56.215076, -47.867058, 670.036438, 1.0 },
@@ -109,7 +114,7 @@ vec4f light[C + 1] = {
 };
 
 /* Global Matrices */
-Mat4x4 perspMat, lookAt, viewMat, worldMat;
+Mat4x4 perspMat, lookAt, viewMat, reperspMat, orthoMat, worldMat;
 
 /* Anvil global Objects Meshes and Scene. */
 Scene scene = { 0 };
@@ -138,10 +143,8 @@ const static void keypress(XEvent *event);
 
 /* Represantation functions */
 const static void project(void);
-const static void drawFrame(void);
 
 /* Xlib relative functions and event dispatcher. */
-const static KeySym getKeysym(XEvent *event);
 const static void initMainWindow(void);
 const static void setupGL(void);
 const static void InitTimeCounter(void);
@@ -153,7 +156,6 @@ const static void initDependedVariables(void);
 const static void atomsinit(void);
 const static void sigsegv_handler(const int sig);
 const static int registerSig(const int signal);
-const static void initBuffers(void);
 static int board(void);
 static void (*handler[LASTEvent]) (XEvent *event) = {
     [ClientMessage] = clientmessage,
@@ -171,7 +173,6 @@ const static void clientmessage(XEvent *event) {
 
         releaseScene(&scene);
 
-        free(frame_buffer);
         XFreeGC(displ, gc);
         XFree(vinfo);
 
@@ -199,12 +200,10 @@ const static void configurenotify(XEvent *event) {
 
     if (!event->xconfigure.send_event) {
         printf("configurenotify event received\n");
-        int old_height = wa.height;
+
         XGetWindowAttributes(displ, win, &wa);
 
         if (INIT) {
-            free(frame_buffer);
-            initBuffers();
 
             initDependedVariables();
         }
@@ -260,13 +259,29 @@ const static void keypress(XEvent *event) {
         //     break;
         // case 99 : rotate_origin(&scene.m[2], 1, 1.0, 0.0, 0.0);  /* c */
         //     break;
+        case 118 :
+            if (!PROJECTIONVIEW)               /* v */
+                PROJECTIONVIEW++;
+            else
+                PROJECTIONVIEW = 0;
+            break;
     }
-    // lookAt = lookat(eye[Pos], eye[U], eye[V], eye[N]);
-    // viewMat = inverse_mat(lookAt);
-    // project();
+    lookAt = lookat(eye[Pos], eye[U], eye[V], eye[N]);
+    viewMat = inverse_mat(lookAt);
+    if (!PROJECTIONVIEW)
+        worldMat = mxm(viewMat, perspMat);
+    else
+        worldMat = mxm(viewMat, orthoMat);
+
+
+    GLint transformLoc;
+    if ( (transformLoc = glGetUniformLocation(shaderProgram, "mvpMatrix")) != 0)
+        fprintf(stderr, "Could not locate uniform variable with name: mvpMatrix. Error: %d\n", transformLoc);
+
+    GLfloat mvpMatrix[16];
+    memcpy(&mvpMatrix, &worldMat, 64);
+    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, mvpMatrix);
 }
-// ##############################################################################################################################################
-/* Starts the Projection Pipeline. */ // ########################################################################################################
 const void initfaceVertices(Mesh *m, const int len) {
     for (int i = 0; i < len; i++) {
         m->f[i].v[0] = m->v[m->f[i].a[0] - 1];
@@ -284,7 +299,7 @@ const void initfaceVertices(Mesh *m, const int len) {
 }
 void createVAO(Mesh *m) {
     const int len = 32 * (m->f_indexes * 3);
-    m->VAO = malloc(len);
+    m->VAO = realloc(m->VAO, len);
     if (!m->VAO)
         perror("Error: ");
 
@@ -305,36 +320,36 @@ void createVAO(Mesh *m) {
     }
 }
 const static void project() {
-
-    // if (!VAO_CREATED) {
-        initfaceVertices(&scene.m[0], scene.m[0].f_indexes);
-        createVAO(&scene.m[0]);
-        VAO_CREATED = 1;
-    // }
-
-    GLuint VAO, VBO;
+    GLuint VAO, VBO, VIO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
+    glGenBuffers(1, &VIO);
 
     glBindVertexArray(VAO);
-    // 0. copy our vertices array in a buffer for OpenGL to use
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, scene.m[0].f_indexes * 32 * 3, scene.m[0].VAO, GL_STATIC_DRAW);
-    // 1. then set the vertex attributes pointers
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    // 1. then set the color attributes pointers
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    // 3. use our shader program when we want to render an object
-    glUseProgram(shaderProgram);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VIO);
 
-    // glEnableClientState(GL_VERTEX_ARRAY);
-    // glVertexPointer(3, GL_FLOAT, 0, vertices);
+    /* Trying to render multiple objects with one buffer. */
+    glBufferData(GL_ARRAY_BUFFER, (scene.m[0].v_indexes * 16) + (scene.m[1].v_indexes * 16), 0, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, scene.m[0].v_indexes * 16, scene.m[0].v);
+    glBufferSubData(GL_ARRAY_BUFFER, scene.m[0].v_indexes * 16, scene.m[1].v_indexes * 16, scene.m[1].v);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (scene.m[0].indices_sum * 4) + (scene.m[1].indices_sum * 4), 0, GL_STATIC_DRAW);
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, scene.m[0].indices_sum * 4, scene.m[0].indices);
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, scene.m[0].indices_sum * 4, scene.m[1].indices_sum * 4, scene.m[1].indices);
+    glVertexAttribPointer(2, 3, GL_INT, GL_FALSE, 9 * sizeof(int), (void*)0);
+    glEnableVertexAttribArray(2);
+
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glDrawArrays(GL_TRIANGLES, 0, scene.m[0].f_indexes * 3);
+    // glDrawArrays(GL_TRIANGLES, 0, (scene.m[0].f_indexes + scene.m[1].f_indexes) * 3);
+    glDrawElements(GL_TRIANGLES, (scene.m[0].indices_sum + scene.m[1].indices_sum), GL_UNSIGNED_INT, (void*)0);
+    // glDrawElements(GL_TRIANGLES, scene.m[1].f_indexes, GL_UNSIGNED_INT, (void*)(scene.m[0].indices_sum * sizeof(int)));
 
     GLenum err;
     while ((err = glGetError()) != GL_NO_ERROR) {
@@ -342,17 +357,19 @@ const static void project() {
     }
     glXSwapBuffers(displ, win);
 
-    // glDisableClientState(GL_VERTEX_ARRAY);
-
     // 4. Unbinding the Vertex and Buffer arrays. 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
     glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+    glDisableVertexAttribArray(2);
+
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &VIO);
 }
-/* Starts the Projection Pipeline. */ // ########################################################################################################
-// ##############################################################################################################################################
 const static void initMainWindow(void) {
     int screen = XDefaultScreen(displ);
     if ( (vinfo = glXChooseVisual(displ, screen, att)) == 0 ) {
@@ -388,8 +405,8 @@ const static void setupGL(void) {
 
     glXMakeCurrent(displ, win, glc);
     glEnable(GL_DEPTH_TEST);
-    // glEnable(GL_CCW);
-    // glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CW);
+    glEnable(GL_CULL_FACE);
     glClearColor(0.00, 0.00, 0.00, 1.00);
 
     /* Initialize Glew and check for Errors. */
@@ -421,13 +438,13 @@ const static void CalculateFPS(void) {
 const static void displayInfo(void) {
     char info_string[50];
 
-    sprintf(info_string, "Resolution: %d x %d\0", wa.width, wa.height);
+    sprintf(info_string, "Resolution: %d x %d", wa.width, wa.height);
     XDrawString(displ ,win ,gc, 5, 12, info_string, strlen(info_string));
 
-    sprintf(info_string, "Running Time: %4.1f\0", TimeCounter);
+    sprintf(info_string, "Running Time: %4.1f", TimeCounter);
     XDrawString(displ ,win ,gc, 5, 24, info_string, strlen(info_string));
 
-    sprintf(info_string, "%4.1f fps\0", FPS);
+    sprintf(info_string, "%4.1f fps", FPS);
     XDrawString(displ ,win ,gc, 5, 36, info_string, strlen(info_string));
 }
 const static void initGlobalGC(void) {
@@ -501,11 +518,14 @@ const static void initDependedVariables(void) {
         glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
         fprintf(stderr, "ERROR::SHADER::PROGRAMM::LINKING_FAILED.\n%s\n", infoLog);
     }
-    // glUseProgram(shaderProgram);
+
     glDetachShader(shaderProgram, vertexShader);
     glDetachShader(shaderProgram, fragmentShader);    
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+
+    /* Use our shader program when we want to render an object. */
+    glUseProgram(shaderProgram);
 
     ASPECTRATIO = ((float)wa.width / (float)wa.height);
     HALFH = wa.height >> 1;
@@ -513,10 +533,8 @@ const static void initDependedVariables(void) {
 
     /* Matrices initialization. */
     perspMat = perspectiveMatrix(FOV, ASPECTRATIO, ZNEAR, ZFAR);
-}
-/* Creates and Initializes the importand buffers. (frame, depth, shadow). */
-const static void initBuffers(void) {
-    frame_buffer = calloc(wa.width * wa.height * 4, 1);
+    reperspMat = reperspectiveMatrix(FOV, ASPECTRATIO);
+    orthoMat = orthographicMatrix(SCALE, SCALE, 0.0, 0.0, ZNEAR, ZFAR);
 }
 const static void announceReady(void) {
     printf("Announcing ready process state event\n");
@@ -549,26 +567,25 @@ static int board(void) {
     InitTimeCounter();
     initGlobalGC();
     atomsinit();
-    // registerSig(SIGSEGV);
+    registerSig(SIGSEGV);
 
     initDependedVariables();
-    initBuffers();
 
     createScene(&scene);
     posWorldObjects(&scene);
 
     /* Announcing to event despatcher that starting initialization is done. We send a Keyress event to Despatcher to awake Projection. */
     announceReady();
-
+    
     while (RUNNING) {
 
         // clock_t start_time = start();
         UpdateTimeCounter();
         CalculateFPS();
         displayInfo();
-        rotate_z(&scene.m[0], 0.2f);
-        rotate_x(&scene.m[0], 0.3f);
-        rotate_y(&scene.m[0], 0.4f);
+        rotate_z(&scene.m[0], 0.07f);
+        rotate_x(&scene.m[0], 0.09f);
+        rotate_y(&scene.m[0], 0.06f);
         project();
         // end(start_time);
 

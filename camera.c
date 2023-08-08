@@ -9,7 +9,7 @@ const void look_left(vec4f *g, const float angle) {
     Quat v = setQuat(0, g[V]);
     Quat n = setQuat(0, g[N]);
 
-    Quat xrot = rotationQuat(2, g[V]);
+    Quat xrot = rotationQuat(-2, g[V]);
     Quat rerot = conjugateQuat(xrot);
 
     Quat resu = multiplyQuats(multiplyQuats(xrot, u), rerot);
@@ -26,7 +26,7 @@ const void look_right(vec4f *g, const float angle) {
     Quat v = setQuat(0, g[V]);
     Quat n = setQuat(0, g[N]);
 
-    Quat xrot = rotationQuat(-2, g[V]);
+    Quat xrot = rotationQuat(2, g[V]);
     Quat rerot = conjugateQuat(xrot);
 
     Quat resu = multiplyQuats(multiplyQuats(xrot, u), rerot);

@@ -25,7 +25,6 @@ const void drawLine(float x1, float y1, float x2, float y2, vec4f color);
 
 const void fillMesh(const Mesh m);
 const void fillface(const face f, const Material mtr);
-const static void fillGeneral(const face f, const Material mtr, const int minX, const int maxX, const int minY, const int maxY);
 
 #endif /* _DRAW_FUNCTIONS_H */
 

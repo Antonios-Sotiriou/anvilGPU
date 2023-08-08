@@ -27,9 +27,9 @@ const void posWorldObjects(Scene *s) {
 
     releaseMesh(&cube);
     /* ######################################################################################################## */
-    Mesh jupiter = loadmesh("objfiles/earth.obj");
-    sclMatrix = scaleMatrix(1.0);
-    trMatrix = translationMatrix(10.0, 0.0, -80.0);
+    Mesh jupiter = loadmesh("objfiles/terrain.obj");
+    sclMatrix = scaleMatrix(10.0);
+    trMatrix = translationMatrix(0.0, 0.0, 1.0);
     posMatrix = mxm(sclMatrix, trMatrix);
 
     jupiter.material = mat;
@@ -58,13 +58,15 @@ const void releaseMesh(Mesh *c) {
     free(c->n);
     free(c->t);
     free(c->f);
-    // free(c->VAO);
+    free(c->indices);
+    free(c->VAO);
 }
 /* Initializing Mesh a from Mesh b. */
 const void initMesh(Mesh *a, const Mesh b) {
     *a = b;
     size_t tsize = sizeof(vec4f) * b.t_indexes;
     size_t fsize = sizeof(face) * b.f_indexes;
+    size_t indsize = sizeof(int) * b.indices_sum;
 
     // a->v = malloc(tsize);
     // memcpy(a->v, b.v, tsize);
@@ -78,8 +80,10 @@ const void initMesh(Mesh *a, const Mesh b) {
     a->f = malloc(fsize);
     memcpy(a->f, b.f, fsize);
 
-    // a->VAO = malloc(32 * b.f_indexes * 3);
-    // memcpy(a->VAO, b.VAO, 32 * b.f_indexes * 3);
+    a->indices = malloc(indsize);
+    memcpy(a->indices, b.indices, indsize);
+
+    a->VAO = malloc(1);
 }
 
 

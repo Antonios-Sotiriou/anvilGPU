@@ -56,10 +56,10 @@ const void rotate_light(Light *l, const float angle, float x, float y, float z) 
     Quat xrot = rotationQuat(1, axis);
     Mat4x4 m = MatfromQuat(xrot, n.v);
 
-    // sunlight.pos = vecxm(l->pos, m);
-    // sunlight.u = vecxm(l->u, m);
-    // sunlight.v = vecxm(l->v, m);
-    // sunlight.n = vecxm(l->n, m);
+    l->pos = vecxm(l->pos, m);
+    l->u = vecxm(l->u, m);
+    l->v = vecxm(l->v, m);
+    l->n = vecxm(l->n, m);
 }
 
 

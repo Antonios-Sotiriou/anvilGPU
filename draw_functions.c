@@ -3,6 +3,7 @@
 extern u_int8_t *frame_buffer;
 extern float *depth_buffer;
 extern XWindowAttributes wa;
+const static void fillGeneral(const face f, const Material mtr, const int minX, const int maxX, const int minY, const int maxY);
 extern const float winding(const face f);
 
 const void drawLine(float x1, float y1, float x2, float y2, vec4f color) {

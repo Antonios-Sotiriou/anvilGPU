@@ -5,6 +5,11 @@ extern float FPlane, NPlane;;
 extern XWindowAttributes wa;
 extern Mat4x4 viewMat, worldMat;
 
+/* Functions declarations. */
+const static void ppdiv(Mesh *m, const int len);
+const static Mesh bfculling(const Mesh c, const int len);
+const static void viewtoscreen(Mesh *m, const int len);
+
 /* Passes the scene Meshes throught the graphic pipeline. */
 const void grfkPipeline(Scene s) {
     Mesh cache = { 0 };
@@ -96,8 +101,8 @@ const static Mesh bfculling(const Mesh m, const int len) {
 const static void viewtoscreen(Mesh *m, const int len) {
     for (int i = 0; i < len; i++) {
         for (int j = 0; j < 3; j++) {
-            m->f[i].v[j][0] = ((++m->f[i].v[j][0]) * HALFW) + 0.5; /* adding 0.5 at this point so we can convert to integer at drawing stage. */
-            m->f[i].v[j][1] = ((++m->f[i].v[j][1]) * HALFH) + 0.5; /* adding 0.5 at this point so we can convert to integer at drawing stage. */
+            m->f[i].v[j][0] = ((1 + m->f[i].v[j][0]) * HALFW) + 0.5; /* adding 0.5 at this point so we can convert to integer at drawing stage. */
+            m->f[i].v[j][1] = ((1 + m->f[i].v[j][1]) * HALFH) + 0.5; /* adding 0.5 at this point so we can convert to integer at drawing stage. */
             m->f[i].v[j][2] *= 0.5;
             m->f[i].v[j][3] = 1 / m->f[i].v[j][3];
         }
@@ -123,15 +128,5 @@ const static void viewtoscreen(Mesh *m, const int len) {
           plane_up_n = { 0.0, 1.0, 0.0 };
     *m = clipp(*m, plane_up_p, plane_up_n);
 }
-/* Rasterize given Mesh by passing them to the appropriate function. */
-const static void rasterize(const Mesh m) {
 
-    // if (DEBUG == 1) {
-    //     edgeMesh(m);
-    // } else if (DEBUG == 2) {
-        // fillMesh(m);
-    // } else {
-    //     texMesh(m);
-    // }
-}
 
