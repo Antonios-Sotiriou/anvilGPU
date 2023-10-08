@@ -4,7 +4,7 @@ static vec4f *loadvectors(const char path[]);
 static vec4f *loadtextors(const char path[]);
 static vec4f *loadnormals(const char path[]);
 static face *loadfaces(const char path[]);
-static int *loadindices(const char path[]);
+static unsigned int *loadindices(const char path[]);
 
 /* vectors array indexes */
 static int v_indexes = 0;
@@ -15,7 +15,7 @@ static int t_indexes = 0;
 /* Face array indexes */
 static int f_indexes = 0;
 /* Indices array indexes */
-static int indices_sum = 0;
+static int i_indexes = 0;
 
 const Mesh loadmesh(const char path[]) {
     Mesh r = { 0 };
@@ -40,10 +40,10 @@ const Mesh loadmesh(const char path[]) {
         fprintf(stderr, "Could not create Faces array. load_obj() - get_faces()\n");
     r.f_indexes = f_indexes;
 
-    r.indices = loadindices(path);
-    if (!r.indices)
+    r.i = loadindices(path);
+    if (!r.i)
         fprintf(stderr, "Could not create Faces array. load_obj() - get_faces()\n");
-    r.indices_sum = indices_sum;
+    r.i_indexes = i_indexes;
 
     return r;
 }
@@ -61,19 +61,24 @@ static face *loadfaces(const char path[]) {
         fclose(fp);
         return NULL;
     }
-    int dynamic_inc = 2;
+    int dynamic_inc = 1;
     int index = 0;
-
+    int va, vb, vc, vd, ve, vf, vg, vh, vi;
     char ch;
     while (!feof(fp)) {
         if ( (ch = getc(fp)) == 'f' )
             if ( (ch = getc(fp)) == ' ' )
                 if (fscanf(fp, "%d/%d/%d %d/%d/%d %d/%d/%d",
-                    &f[index].a[0], &f[index].a[1], &f[index].a[2], 
-                    &f[index].b[0], &f[index].b[1], &f[index].b[2], 
-                    &f[index].c[0], &f[index].c[1], &f[index].c[2] ) == 9){
+                    &va, &vb, &vc,
+                    &vd, &ve, &vf,
+                    &vg, &vh, &vi ) == 9){
 
                     f = realloc(f, facesize * dynamic_inc);
+                    f[index].a[0] = va - 1, f[index].a[1] = vb - 1, f[index].a[2] = vc - 1,
+                    f[index].b[0] = vd - 1, f[index].b[1] = ve - 1, f[index].b[2] = vf - 1,
+                    f[index].c[0] = vg - 1, f[index].c[1] = vh - 1, f[index].c[2] = vi - 1;
+
+
                     if (!f) {
                         fprintf(stderr, "Could not reallocate memory for Face struct array. load_obj() -- realloc().\n");
                         fclose(fp);
@@ -89,50 +94,50 @@ static face *loadfaces(const char path[]) {
     fclose(fp);
     return f;
 }
-static int *loadindices(const char path[]) {
-    size_t indice_size = sizeof(int) * 9;
+static unsigned int *loadindices(const char path[]) {
+    size_t indice_size = sizeof(unsigned int) * 3;
     FILE *fp = fopen(path, "r");
     if (!fp) {
         fprintf(stderr, "Could not open file : %s.\n", path);
         return NULL;
     }
 
-    int *i = malloc(indice_size);
-    if (!i) {
+    unsigned int *inx = malloc(indice_size);
+    if (!inx) {
         fprintf(stderr, "Could not allocate memory for Face struct. load_obj() -- malloc().\n");
         fclose(fp);
         return NULL;
     }
-    int dynamic_inc = 2;
+    int dynamic_inc = 1;
     int index = 0;
-
+    int va, vb, vc, vd, ve, vf, vg, vh, vi;
     char ch;
     while (!feof(fp)) {
         if ( (ch = getc(fp)) == 'f' )
             if ( (ch = getc(fp)) == ' ' )
                 if (fscanf(fp, "%d/%d/%d %d/%d/%d %d/%d/%d",
-                    &i[index + 0], &i[index + 3], &i[index + 6], 
-                    &i[index + 1], &i[index + 4], &i[index + 7], 
-                    &i[index + 2], &i[index + 5], &i[index + 8] ) == 9){
+                    &va, &vb, &vc,
+                    &vd, &ve, &vf,
+                    &vg, &vh, &vi ) == 9){
 
-                    i = realloc(i, indice_size * dynamic_inc);
-                    i[index + 0] -= 1, i[index + 3] -= 1, i[index + 6] -= 1, 
-                    i[index + 1] -= 1, i[index + 4] -= 1, i[index + 7] -= 1, 
-                    i[index + 2] -= 1, i[index + 5] -= 1, i[index + 8] -= 1;
-                    if (!i) {
+                    inx = realloc(inx, indice_size * dynamic_inc);
+                    inx[index + 0] = va - 1;//, inx[index + 3] -= 1, inx[index + 6] -= 1,
+                    inx[index + 1] = vd - 1;//, inx[index + 4] -= 1, inx[index + 7] -= 1,
+                    inx[index + 2] = vg - 1;//, inx[index + 5] -= 1, inx[index + 8] -= 1;
+                    if (!inx) {
                         fprintf(stderr, "Could not reallocate memory for Face struct array. load_obj() -- realloc().\n");
                         fclose(fp);
-                        free(i);
+                        free(inx);
                         return NULL;
                     }
-                    index += 9;
+                    index += 3;
                     dynamic_inc++;
                 }
     }
 
-    indices_sum = index;
+    i_indexes = index;
     fclose(fp);
-    return i;
+    return inx;
 }
 static vec4f *loadvectors(const char path[]) {
     size_t vecsize = sizeof(vec4f);

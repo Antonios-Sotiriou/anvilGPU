@@ -51,11 +51,11 @@ typedef struct {
     vec4f *n;
     vec4f *t;
     face *f;
-    int *indices;
+    unsigned int *i;
     float *VAO;
     // void (*drawMesh)(void *args);
     signed int texture_height, texture_width;
-    int v_indexes, f_indexes, n_indexes, t_indexes, indices_sum;
+    int v_indexes, f_indexes, n_indexes, t_indexes, i_indexes;
     Material material;
 } Mesh;
 

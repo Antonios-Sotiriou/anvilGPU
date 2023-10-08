@@ -1,3 +1,6 @@
+/* General Macro definitions */
+#define _GNU_SOURCE /* Importand to counter sigaction struct < incomplete type error >. */
+
 /* general headers */
 #include <stdio.h>
 #include <stdlib.h>
@@ -284,17 +287,17 @@ const static void keypress(XEvent *event) {
 }
 const void initfaceVertices(Mesh *m, const int len) {
     for (int i = 0; i < len; i++) {
-        m->f[i].v[0] = m->v[m->f[i].a[0] - 1];
-        m->f[i].v[1] = m->v[m->f[i].b[0] - 1];
-        m->f[i].v[2] = m->v[m->f[i].c[0] - 1];
+        m->f[i].v[0] = m->v[m->f[i].a[0]];
+        m->f[i].v[1] = m->v[m->f[i].b[0]];
+        m->f[i].v[2] = m->v[m->f[i].c[0]];
 
-        m->f[i].vt[0] = m->t[m->f[i].a[1] - 1];
-        m->f[i].vt[1] = m->t[m->f[i].b[1] - 1];
-        m->f[i].vt[2] = m->t[m->f[i].c[1] - 1];
+        m->f[i].vt[0] = m->t[m->f[i].a[1]];
+        m->f[i].vt[1] = m->t[m->f[i].b[1]];
+        m->f[i].vt[2] = m->t[m->f[i].c[1]];
 
-        m->f[i].vn[0] = m->n[m->f[i].a[2] - 1];
-        m->f[i].vn[1] = m->n[m->f[i].b[2] - 1];
-        m->f[i].vn[2] = m->n[m->f[i].c[2] - 1];
+        m->f[i].vn[0] = m->n[m->f[i].a[2]];
+        m->f[i].vn[1] = m->n[m->f[i].b[2]];
+        m->f[i].vn[2] = m->n[m->f[i].c[2]];
     }
 }
 void createVAO(Mesh *m) {
@@ -320,55 +323,54 @@ void createVAO(Mesh *m) {
     }
 }
 const static void project() {
-    GLuint VAO, VBO, VIO;
-    glGenVertexArrays(1, &VAO);
+    unsigned int *indices = calloc(scene.m[0].i_indexes + scene.m[1].i_indexes, 4);
+    memcpy(indices, scene.m[0].i, sizeof(unsigned int) * scene.m[0].i_indexes);
+
+    int in_count = 0;
+    for (int i = scene.m[0].i_indexes; i < (scene.m[0].i_indexes + scene.m[1].i_indexes); i++) {
+        indices[i] = scene.m[1].i[in_count] + scene.m[0].v_indexes;
+        in_count++;
+    }
+
+    GLuint VBO, VIO;
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &VIO);
 
-    glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VIO);
 
     /* Trying to render multiple objects with one buffer. */
     glBufferData(GL_ARRAY_BUFFER, (scene.m[0].v_indexes * 16) + (scene.m[1].v_indexes * 16), 0, GL_STATIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, scene.m[0].v_indexes * 16, scene.m[0].v);
-    glBufferSubData(GL_ARRAY_BUFFER, scene.m[0].v_indexes * 16, scene.m[1].v_indexes * 16, scene.m[1].v);
+    glBufferSubData(GL_ARRAY_BUFFER, scene.m[0].v_indexes * 16, (scene.m[1].v_indexes * 16), scene.m[1].v);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(0 * sizeof(float)));
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (scene.m[0].indices_sum * 4) + (scene.m[1].indices_sum * 4), 0, GL_STATIC_DRAW);
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, scene.m[0].indices_sum * 4, scene.m[0].indices);
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, scene.m[0].indices_sum * 4, scene.m[1].indices_sum * 4, scene.m[1].indices);
-    glVertexAttribPointer(2, 3, GL_INT, GL_FALSE, 9 * sizeof(int), (void*)0);
-    glEnableVertexAttribArray(2);
-
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (scene.m[0].i_indexes + scene.m[1].i_indexes) * 4, indices, GL_STATIC_DRAW);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // glDrawArrays(GL_TRIANGLES, 0, (scene.m[0].f_indexes + scene.m[1].f_indexes) * 3);
-    glDrawElements(GL_TRIANGLES, (scene.m[0].indices_sum + scene.m[1].indices_sum), GL_UNSIGNED_INT, (void*)0);
-    // glDrawElements(GL_TRIANGLES, scene.m[1].f_indexes, GL_UNSIGNED_INT, (void*)(scene.m[0].indices_sum * sizeof(int)));
+    glDrawElements(GL_TRIANGLES, (scene.m[0].i_indexes + scene.m[1].i_indexes), GL_UNSIGNED_INT, (void*)0);
 
     GLenum err;
     while ((err = glGetError()) != GL_NO_ERROR) {
-        fprintf(stderr, "An OpenGL ERROR has occured: %s", err);
+        fprintf(stderr, "An OpenGL ERROR has occured: %d\n", err);
+        perror("OpenGL ERROR: ");
     }
     glXSwapBuffers(displ, win);
 
     // 4. Unbinding the Vertex and Buffer arrays. 
-    glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
-    glDisableVertexAttribArray(2);
 
-    glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &VIO);
+    free(indices);
 }
 const static void initMainWindow(void) {
     int screen = XDefaultScreen(displ);
@@ -404,13 +406,13 @@ const static void setupGL(void) {
     }
 
     glXMakeCurrent(displ, win, glc);
-    glEnable(GL_DEPTH_TEST);
     glFrontFace(GL_CW);
     glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
     glClearColor(0.00, 0.00, 0.00, 1.00);
 
     /* Initialize Glew and check for Errors. */
-    GLenum err = glewInit();
+    const GLenum err = glewInit();
     if (GLEW_OK != err) {
         /* Problem: glewInit failed, something is seriously wrong. */
         fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
@@ -567,7 +569,7 @@ static int board(void) {
     InitTimeCounter();
     initGlobalGC();
     atomsinit();
-    registerSig(SIGSEGV);
+    // registerSig(SIGSEGV);
 
     initDependedVariables();
 

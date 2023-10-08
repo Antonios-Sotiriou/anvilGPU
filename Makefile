@@ -1,7 +1,7 @@
 # Compile all c files to anvil executable!
 
 CC = gcc
-CFLAGS = -Werror #-O2 -Os -Og -O0
+CFLAGS = -Werror -g#-O2 -Os -Og -O0
 OBJ = anvil
 RM = rm
 LINKS = -lX11 -lm -lGLEW -lGLU -lGL

@@ -8,7 +8,7 @@ const void posWorldObjects(Scene *s) {
     // createCube(&cube);
     Mat4x4 sclMatrix, trMatrix, posMatrix;
     
-    sclMatrix = scaleMatrix(0.1);
+    sclMatrix = scaleMatrix(1.0);
     trMatrix = translationMatrix(0.0, 0.0, 0.0);
     posMatrix = mxm(sclMatrix, trMatrix);
 
@@ -58,7 +58,7 @@ const void releaseMesh(Mesh *c) {
     free(c->n);
     free(c->t);
     free(c->f);
-    free(c->indices);
+    free(c->i);
     free(c->VAO);
 }
 /* Initializing Mesh a from Mesh b. */
@@ -66,7 +66,7 @@ const void initMesh(Mesh *a, const Mesh b) {
     *a = b;
     size_t tsize = sizeof(vec4f) * b.t_indexes;
     size_t fsize = sizeof(face) * b.f_indexes;
-    size_t indsize = sizeof(int) * b.indices_sum;
+    size_t indsize = sizeof(int) * b.i_indexes;
 
     // a->v = malloc(tsize);
     // memcpy(a->v, b.v, tsize);
@@ -80,8 +80,8 @@ const void initMesh(Mesh *a, const Mesh b) {
     a->f = malloc(fsize);
     memcpy(a->f, b.f, fsize);
 
-    a->indices = malloc(indsize);
-    memcpy(a->indices, b.indices, indsize);
+    a->i = malloc(indsize);
+    memcpy(a->i, b.i, indsize);
 
     a->VAO = malloc(1);
 }

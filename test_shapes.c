@@ -6,7 +6,9 @@ const void createCube(Mesh *c) {
     c->v = malloc(vec4f_size * 8);
     c->n = malloc(vec4f_size * 8);
     c->t = malloc(vec4f_size * 14);
+    c->i = malloc(4 * 108);
     c->f = malloc(face_size * 12);
+    c->VAO = malloc(1);
 
     vec4f vectors[8] = {
         { -1.000000, -1.000000, -1.000000, 1.0 },
@@ -44,6 +46,20 @@ const void createCube(Mesh *c) {
         { 0.499504, 0.666010, 0.0, 0.0 },
         { 0.499493, 0.334624, 0.0, 0.0 }
     };
+    unsigned int indices[108] = {
+        2, 6, 0, 0, 0, 1, 4, 8, 2,
+        7, 13, 3, 3, 7, 4, 2, 6, 0,
+        5, 11, 5, 7, 13, 3, 6, 12, 6,
+        7, 13, 3, 5, 10, 5, 1, 4, 7,
+        3, 7, 4, 1, 3, 7, 0, 1, 1,
+        1, 5, 7, 5, 11, 5, 4, 9, 2,
+        2, 6, 0, 4, 8, 2, 6, 12, 6,
+        7, 13, 3, 2, 6, 0, 6, 12, 6,
+        5, 11, 5, 6, 12, 6, 4, 9, 2,
+        7, 13, 3, 1, 4, 7, 3, 7, 4,
+        3, 7, 4, 0, 1, 1, 2, 6, 0,
+        1, 5, 7, 4, 9, 2, 0, 2, 1
+    };
     face faces[12] = {
         { .a = { 2, 6, 0 }, .b = { 0, 0, 1 }, .c = { 4, 8, 2 } },
         { .a = { 7, 13, 3 }, .b = { 3, 7, 4 }, .c = { 2, 6, 0 } },
@@ -61,11 +77,13 @@ const void createCube(Mesh *c) {
     c->v_indexes = 8;
     c->n_indexes = 8;
     c->t_indexes = 14;
+    c->i_indexes = 108;
     c->f_indexes = 12;
 
     memcpy(c->v, vectors, vec4f_size * 8);
     memcpy(c->n, normals, vec4f_size * 8);
     memcpy(c->t, textures, vec4f_size * 14);
+    memcpy(c->i, indices, 4 * 108);
     memcpy(c->f, faces, face_size * 12);
 }
 
